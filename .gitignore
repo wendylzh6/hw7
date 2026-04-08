@@ -5,6 +5,19 @@ style.json
 __pycache__/
 *.pyc
 .venv/
-projects/project_*/
-!projects/.gitkeep
 
+# Large generated media (pipeline output)
+*.mp4
+**/segments/**
+
+# Slide renders and TTS (keep directory via .gitkeep only)
+slide_images/*
+!slide_images/.gitkeep
+audio/*
+!audio/.gitkeep
+projects/**/slide_images/*
+!projects/**/slide_images/.gitkeep
+projects/**/audio/*
+!projects/**/audio/.gitkeep
+
+projects/.gitkeep

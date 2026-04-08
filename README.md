@@ -7,25 +7,31 @@ Agentic flow: transcript → `style.json` → slide images → descriptions → 
 ```text
 your-repo/
 ├── README.md
-├── style.json                 # generated at repo root on first run (gitignored; see style.example.json)
-├── Lecture_17_AI_screenplays.pdf
+├── Lecture_17_AI_screenplays.pdf   # deck at repo root for graders
+├── Captions_English.txt            # lecture transcript (input)
+├── style.json                      # generated on first run (gitignored; see style.example.json)
 ├── requirements.txt
-├── run_lecture_pipeline.py    # entrypoint
-├── lecture_agents/            # agent implementation
+├── run_lecture_pipeline.py         # entrypoint
+├── lecture_agents/                 # agent implementation
 │   ├── __init__.py
 │   └── core.py
-├── env.example                # copy to .env and/or gemini.env
-├── style.example.json         # shape reference before first run
+├── env.example                     # copy to .env and/or gemini.env
+├── style.example.json
+├── slide_images/                   # empty placeholder; run output also under projects/.../slide_images/
+├── audio/                          # empty placeholder; run output also under projects/.../audio/
 └── projects/
     └── project_YYYYMMDD_HHMMSS/
         ├── premise.json
         ├── arc.json
         ├── slide_description.json
         ├── slide_description_narration.json
-        ├── slide_images/          # PNGs per slide (created at run time)
-        ├── audio/                 # if ElevenLabs configured
-        └── segments/            # if video step runs
+        ├── slide_images/          # PNGs (gitignored)
+        ├── audio/                 # MP3s (gitignored)
+        ├── segments/              # ffmpeg segments (gitignored)
+        └── Lecture_17_AI_screenplays.mp4   # final video (gitignored)
 ```
+
+Generated **PNG, MP3, MP4**, and **segments** are listed in `.gitignore` so large binaries are not committed. JSON outputs under `projects/` are not ignored.
 
 ## Setup
 
