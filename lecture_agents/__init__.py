@@ -1,5 +1,5 @@
-"""Agentic lecture pipeline: style, slide descriptions, premise, arc, narration, optional TTS/video."""
+"""Lecture deck → narrated video: multi-stage agents + TTS + ffmpeg."""
 
-from lecture_agents.core import LectureVideoPipeline
+from lecture_agents.pipeline import LectureVideoPipeline
 
 __all__ = ["LectureVideoPipeline"]
