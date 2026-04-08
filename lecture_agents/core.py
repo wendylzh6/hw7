@@ -17,8 +17,7 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 def _load_repo_env() -> None:
-    load_dotenv(_REPO_ROOT / ".env")
-    load_dotenv(_REPO_ROOT / "gemini.env", override=True)
+    load_dotenv(_REPO_ROOT / "gemini.env")
 
 
 def _timestamp_project_name() -> str:
@@ -61,13 +60,15 @@ class AIClient:
     def from_env(cls) -> "AIClient":
         key = os.getenv("GEMINI_API_KEY")
         if not key:
-            env_path = _REPO_ROOT / ".env"
+            env_path = _REPO_ROOT / "gemini.env"
             hint = ""
             if env_path.exists() and env_path.stat().st_size == 0:
                 hint = (
                     f" {env_path} exists but is empty on disk; save your editor buffer "
                     "or add GEMINI_API_KEY=... to the file."
                 )
+            elif not env_path.exists():
+                hint = f" Create {env_path} from gemini.env.example and add keys."
             raise RuntimeError(f"Missing GEMINI_API_KEY in environment.{hint}")
         model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
         return cls(api_key=key, model=model)
@@ -165,7 +166,7 @@ def _make_ai_client() -> Any:
         return OpenAIClient.from_env()
     raise RuntimeError(
         "No AI credentials: set GEMINI_API_KEY (Google Gemini) or OPENAI_API_KEY "
-        "in .env or gemini.env."
+        "in gemini.env (see gemini.env.example)."
     )
 
 
@@ -244,7 +245,7 @@ class LectureVideoPipeline:
             note = project_dir / "AUDIO_VIDEO_SKIPPED.txt"
             note.write_text(
                 "ElevenLabs is not configured (set ELEVENLABS_API_KEY and "
-                "ELEVENLABS_VOICE_ID in .env or gemini.env). Narration JSON is complete; "
+                "ELEVENLABS_VOICE_ID in gemini.env). Narration JSON is complete; "
                 "add keys and re-run or run a separate audio step.\n",
                 encoding="utf-8",
             )

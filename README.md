@@ -15,7 +15,7 @@ your-repo/
 ├── lecture_agents/                 # agent implementation
 │   ├── __init__.py
 │   └── core.py
-├── env.example                     # copy to .env and/or gemini.env
+├── gemini.env.example              # copy to gemini.env (tracked template; secrets stay local)
 ├── style.example.json
 ├── slide_images/                   # empty placeholder; run output also under projects/.../slide_images/
 ├── audio/                          # empty placeholder; run output also under projects/.../audio/
@@ -37,15 +37,15 @@ Generated **PNG, MP3, MP4**, and **segments** are listed in `.gitignore` so larg
 
 - Python 3.10+
 - `ffmpeg` + `ffprobe` on `PATH` (only for final video step)
-- **AI**: set `GEMINI_API_KEY` (Google Gemini, preferred) **or** `OPENAI_API_KEY` in `.env` and/or `gemini.env` (see `env.example`). `gemini.env` overrides `.env` for duplicate keys.
+- **AI**: set `GEMINI_API_KEY` (Google Gemini, preferred) **or** `OPENAI_API_KEY` in `gemini.env` (copy from `gemini.env.example`).
 - **TTS (optional)**: `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` — omit to stop after narration JSON.
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-cp env.example .env
-# optional: cp env.example gemini.env  # then add keys
+cp gemini.env.example gemini.env
+# edit gemini.env and add your keys
 ```
 
 ## Run
