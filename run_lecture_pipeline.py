@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-from pipeline.core import LectureVideoPipeline
+from lecture_agents import LectureVideoPipeline
 
 
 def parse_args() -> argparse.Namespace:
@@ -28,10 +28,15 @@ def main() -> None:
         transcript_path=Path(args.transcript),
         projects_root=Path(args.projects_root),
     )
-    output_video = pipeline.run(instructor_name=args.instructor_name)
-    print(f"Pipeline complete. Video written to: {output_video}")
+    result = pipeline.run(instructor_name=args.instructor_name)
+    if result.suffix.lower() == ".mp4":
+        print(f"Pipeline complete. Video written to: {result}")
+    else:
+        print(
+            f"Pipeline complete (no video: ElevenLabs/ffmpeg not used or skipped). "
+            f"Outputs in: {result}"
+        )
 
 
 if __name__ == "__main__":
     main()
-

@@ -13,6 +13,13 @@ import fitz  # PyMuPDF
 import requests
 from dotenv import load_dotenv
 
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _load_repo_env() -> None:
+    load_dotenv(_REPO_ROOT / ".env")
+    load_dotenv(_REPO_ROOT / "gemini.env", override=True)
+
 
 def _timestamp_project_name() -> str:
     return f"project_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -41,6 +48,10 @@ def _require_ffmpeg() -> None:
         raise RuntimeError("ffprobe is required and not found on PATH.")
 
 
+def _elevenlabs_configured() -> bool:
+    return bool(os.getenv("ELEVENLABS_API_KEY") and os.getenv("ELEVENLABS_VOICE_ID"))
+
+
 @dataclass
 class AIClient:
     api_key: str
@@ -50,7 +61,14 @@ class AIClient:
     def from_env(cls) -> "AIClient":
         key = os.getenv("GEMINI_API_KEY")
         if not key:
-            raise RuntimeError("Missing GEMINI_API_KEY in environment.")
+            env_path = _REPO_ROOT / ".env"
+            hint = ""
+            if env_path.exists() and env_path.stat().st_size == 0:
+                hint = (
+                    f" {env_path} exists but is empty on disk; save your editor buffer "
+                    "or add GEMINI_API_KEY=... to the file."
+                )
+            raise RuntimeError(f"Missing GEMINI_API_KEY in environment.{hint}")
         model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
         return cls(api_key=key, model=model)
 
@@ -92,6 +110,66 @@ class AIClient:
 
 
 @dataclass
+class OpenAIClient:
+    """OpenAI Chat Completions + optional vision; same `generate_json` contract as `AIClient`."""
+
+    api_key: str
+    model: str
+
+    @classmethod
+    def from_env(cls) -> "OpenAIClient":
+        key = os.getenv("OPENAI_API_KEY")
+        if not key:
+            raise RuntimeError("Missing OPENAI_API_KEY.")
+        model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        return cls(api_key=key, model=model)
+
+    def generate_json(self, prompt: str, image_path: Path | None = None) -> Dict[str, Any]:
+        from openai import OpenAI
+
+        client = OpenAI(api_key=self.api_key)
+        if image_path:
+            b64 = base64.b64encode(image_path.read_bytes()).decode("utf-8")
+            user_content: Any = [
+                {"type": "text", "text": prompt},
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/png;base64,{b64}"},
+                },
+            ]
+        else:
+            user_content = prompt
+
+        kwargs: Dict[str, Any] = {
+            "model": self.model,
+            "messages": [{"role": "user", "content": user_content}],
+        }
+        try:
+            response = client.chat.completions.create(
+                **kwargs, response_format={"type": "json_object"}
+            )
+        except Exception:
+            response = client.chat.completions.create(**kwargs)
+        text = response.choices[0].message.content or ""
+        cleaned = _clean_json_text(text)
+        try:
+            return json.loads(cleaned)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(f"Model did not return valid JSON.\n{text}") from exc
+
+
+def _make_ai_client() -> Any:
+    if os.getenv("GEMINI_API_KEY"):
+        return AIClient.from_env()
+    if os.getenv("OPENAI_API_KEY"):
+        return OpenAIClient.from_env()
+    raise RuntimeError(
+        "No AI credentials: set GEMINI_API_KEY (Google Gemini) or OPENAI_API_KEY "
+        "in .env or gemini.env."
+    )
+
+
+@dataclass
 class ElevenLabsTTS:
     api_key: str
     voice_id: str
@@ -127,13 +205,17 @@ class ElevenLabsTTS:
 
 class LectureVideoPipeline:
     def __init__(self, pdf_path: Path, transcript_path: Path, projects_root: Path) -> None:
-        load_dotenv()
-        _require_ffmpeg()
+        _load_repo_env()
         self.pdf_path = pdf_path
         self.transcript_path = transcript_path
         self.projects_root = projects_root
-        self.ai = AIClient.from_env()
-        self.tts = ElevenLabsTTS.from_env()
+        self.ai = _make_ai_client()
+        self._tts: ElevenLabsTTS | None = None
+
+    def _get_tts(self) -> ElevenLabsTTS:
+        if self._tts is None:
+            self._tts = ElevenLabsTTS.from_env()
+        return self._tts
 
     def run(self, instructor_name: str = "the instructor") -> Path:
         self.projects_root.mkdir(parents=True, exist_ok=True)
@@ -145,7 +227,7 @@ class LectureVideoPipeline:
         audio_dir.mkdir(parents=True, exist_ok=True)
         segment_dir.mkdir(parents=True, exist_ok=True)
 
-        style_path = Path("style.json")
+        style_path = _REPO_ROOT / "style.json"
         if not style_path.exists():
             style = self._make_style_json()
             _write_json(style_path, style)
@@ -158,7 +240,17 @@ class LectureVideoPipeline:
         narrations = self._make_narrations(
             project_dir, slide_images, style, premise, arc, descriptions, instructor_name
         )
+        if not _elevenlabs_configured():
+            note = project_dir / "AUDIO_VIDEO_SKIPPED.txt"
+            note.write_text(
+                "ElevenLabs is not configured (set ELEVENLABS_API_KEY and "
+                "ELEVENLABS_VOICE_ID in .env or gemini.env). Narration JSON is complete; "
+                "add keys and re-run or run a separate audio step.\n",
+                encoding="utf-8",
+            )
+            return project_dir
         self._synthesize_audio(slide_images, narrations, audio_dir)
+        _require_ffmpeg()
         output_video = self._assemble_video(slide_images, audio_dir, segment_dir, project_dir)
         return output_video
 
@@ -326,7 +418,7 @@ all_prior_narrations:
         for idx, _ in enumerate(slide_images, start=1):
             text = narrations[idx - 1]["narration"]
             out = out_dir / f"slide_{idx:03d}.mp3"
-            self.tts.synthesize_to_mp3(text, out)
+            self._get_tts().synthesize_to_mp3(text, out)
 
     def _assemble_video(
         self, slide_images: List[Path], audio_dir: Path, segment_dir: Path, project_dir: Path
@@ -379,4 +471,3 @@ all_prior_narrations:
         ]
         subprocess.run(concat_cmd, check=True, capture_output=True)
         return output_video
-

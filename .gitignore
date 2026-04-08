@@ -1,4 +1,7 @@
 .env
+gemini.env
+style.json
+.DS_Store
 __pycache__/
 *.pyc
 .venv/

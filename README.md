@@ -1,66 +1,60 @@
-# Lecture PDF Narration Pipeline
+# Lecture PDF narration pipeline
 
-This repository creates a narrated lecture video from:
+Agentic flow: transcript → `style.json` → slide images → descriptions → premise → arc → narrations → optional TTS + video.
 
-- a lecture slide PDF
-- a lecture transcript text file
+## Repository layout
 
-It implements:
-
-1. `style.json` generation at repo root (from transcript)
-2. project creation under `projects/project_<YYYYMMDD_HHMMSS>/`
-3. slide rasterization to `slide_images/slide_###.png`
-4. per-slide AI descriptions into `slide_description.json`
-5. premise generation into `premise.json`
-6. arc generation into `arc.json`
-7. per-slide narrations into `slide_description_narration.json`
-8. per-slide TTS MP3 files under `audio/slide_###.mp3`
-9. ffmpeg segment mux + concat into `<pdf_basename>.mp4`
+```text
+your-repo/
+├── README.md
+├── style.json                 # generated at repo root on first run (gitignored; see style.example.json)
+├── Lecture_17_AI_screenplays.pdf
+├── requirements.txt
+├── run_lecture_pipeline.py    # entrypoint
+├── lecture_agents/            # agent implementation
+│   ├── __init__.py
+│   └── core.py
+├── env.example                # copy to .env and/or gemini.env
+├── style.example.json         # shape reference before first run
+└── projects/
+    └── project_YYYYMMDD_HHMMSS/
+        ├── premise.json
+        ├── arc.json
+        ├── slide_description.json
+        ├── slide_description_narration.json
+        ├── slide_images/          # PNGs per slide (created at run time)
+        ├── audio/                 # if ElevenLabs configured
+        └── segments/            # if video step runs
+```
 
 ## Setup
 
-Prerequisites:
-
 - Python 3.10+
-- `ffmpeg` and `ffprobe` on `PATH`
-- Gemini API key
-- ElevenLabs API key + voice ID
-
-Install:
+- `ffmpeg` + `ffprobe` on `PATH` (only for final video step)
+- **AI**: set `GEMINI_API_KEY` (Google Gemini, preferred) **or** `OPENAI_API_KEY` in `.env` and/or `gemini.env` (see `env.example`). `gemini.env` overrides `.env` for duplicate keys.
+- **TTS (optional)**: `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` — omit to stop after narration JSON.
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-```
-
-Create `.env` in repo root:
-
-```bash
-GEMINI_API_KEY=...
-GEMINI_MODEL=gemini-2.5-flash
-ELEVENLABS_API_KEY=...
-ELEVENLABS_VOICE_ID=...
-ELEVENLABS_MODEL_ID=eleven_multilingual_v2
+cp env.example .env
+# optional: cp env.example gemini.env  # then add keys
 ```
 
 ## Run
 
 ```bash
-python run_pipeline.py \
-  --pdf "/path/to/Lecture_17_AI_screenplays.pdf" \
-  --transcript "/path/to/lecture_17_transcript.txt" \
+python run_lecture_pipeline.py \
+  --pdf Lecture_17_AI_screenplays.pdf \
+  --transcript Captions_English.txt \
   --instructor-name "Dr. Smith"
 ```
 
-Output project is created under `projects/project_<timestamp>/` and final video is:
-
-- `projects/project_<timestamp>/Lecture_17_AI_screenplays.mp4`
+With ElevenLabs + ffmpeg configured, the final video is under the new project folder, named like the PDF (e.g. `Lecture_17_AI_screenplays.mp4`).
 
 ## Notes
 
-- Narration generation is sequential and includes prior narrations for continuity.
-- On slide 1, narration is prompted to include instructor introduction and brief lecture summary.
-- Segment duration follows audio using ffmpeg `-shortest` to avoid silent tails.
-- This implementation is inspired by the staged architecture used in [`zlisto/video_summarizer`](https://github.com/zlisto/video_summarizer.git).
-
+- Narration is sequential and uses prior narrations for continuity.
+- Slide 1 narration prompts a title-slide intro + short topic summary.
+- Inspired by the staged layout in [`zlisto/video_summarizer`](https://github.com/zlisto/video_summarizer.git).
