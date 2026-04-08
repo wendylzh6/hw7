@@ -1,75 +1,50 @@
-# Lecture PDF → narrated video (multi-stage agents)
+# Lecture PDF → narrated video
 
-Classroom-scale pipeline: **structured AI steps** (style profile, slide descriptions, premise, arc, narration) → **text-to-speech** → **ffmpeg** (one still per slide, audio-synced segments, concatenated `.mp4`). Narration is steered by **`style.json`**, derived from the **lecture transcript**, so the spoken voice matches the instructor’s style (tone, pacing, fillers, framing).
+Multi-stage **AI agents** (style profile from transcript, slide descriptions, premise, arc, narration) → **text-to-speech** → **ffmpeg** (one still per slide, audio length drives segment duration, concatenated into one `.mp4`). Narration follows **`style.json`**, derived from the lecture transcript.
 
-Architecture is inspired by the multi-stage agent layout in [**zlisto/awesome-o**](https://github.com/zlisto/awesome-o.git) (premise → arc → structured JSON under `projects/`) and by [**zlisto/video_summarizer**](https://github.com/zlisto/video_summarizer.git) (shot/storyboard → render).
-
-## Agentic flow
-
-```text
-Captions_English.txt  →  style.json (repo root)
-       ↓
-Lecture_17_AI_screenplays.pdf  →  slide_images/slide_NNN.png
-       ↓
-slide_description.json  →  premise.json  →  arc.json
-       ↓
-slide_description_narration.json
-       ↓
-audio/slide_NNN.mp3  (ElevenLabs)  →  ffmpeg segments  →  single .mp4
-```
+Implementation patterns are informed by [zlisto/awesome-o](https://github.com/zlisto/awesome-o.git) (structured JSON under `projects/`) and [zlisto/video_summarizer](https://github.com/zlisto/video_summarizer.git) (pipeline stages → render). **Repository layout below is fixed**; only behavior inside `lecture_agents/` evolves.
 
 ## Repository layout
 
 ```text
 your-repo/
 ├── README.md
-├── Lecture_17_AI_screenplays.pdf   # deck at repo root for graders
-├── Captions_English.txt            # lecture transcript (input)
-├── style.json                      # generated on first run (gitignored; see style.example.json)
+├── style.json
+├── Lecture_17_AI_screenplays.pdf
 ├── requirements.txt
-├── run_lecture_pipeline.py         # entrypoint — run from repo root
-├── lecture_agents/                 # agent implementation (multi-module)
-│   ├── __init__.py
-│   ├── repo_paths.py
-│   ├── env_loader.py
-│   ├── utils.py
-│   ├── clients.py                  # Gemini / OpenAI / ElevenLabs
-│   ├── stages.py                   # style, rasterize, premise, arc, narration, ffmpeg
-│   └── pipeline.py                 # LectureVideoPipeline orchestration
-├── gemini.env.example              # copy to gemini.env (tracked template)
-├── style.example.json
-├── slide_images/                   # empty placeholder
-├── audio/                          # empty placeholder
+├── run_lecture_pipeline.py    # entrypoint for the agentic flow
+├── lecture_agents/            # agent code
 └── projects/
     └── project_YYYYMMDD_HHMMSS/
         ├── premise.json
         ├── arc.json
         ├── slide_description.json
-        ├── slide_description_narration.json
-        ├── slide_images/          # PNGs (gitignored)
-        ├── audio/                 # MP3s (gitignored)
-        ├── segments/              # ffmpeg segments (gitignored)
-        └── Lecture_17_AI_screenplays.mp4   # final video (gitignored)
+        └── slide_description_narration.json
 ```
 
-Generated **PNG, MP3, MP4**, and **segments** are in `.gitignore`. JSON under `projects/` is not ignored.
+`style.json` is written at the **repository root** the first time you run the pipeline (from your transcript). You may commit it after generation.
 
-## Requirements
+## Runtime outputs (gitignored)
+
+When you run the pipeline, each `projects/project_…/` folder also gains **`slide_images/`** (PNGs), **`audio/`** (MP3s), optional **ffmpeg `segments/`**, and a final **`.mp4`** named like the PDF. Those paths are listed in `.gitignore` so large binaries are not committed.
+
+## Setup
 
 - Python 3.10+
-- **`ffmpeg`** + **`ffprobe`** on `PATH` (for the final video step)
-- **AI**: `GEMINI_API_KEY` **or** `GOOGLE_API_KEY` (Gemini), **or** `OPENAI_API_KEY` — set in **`gemini.env`** (copy from `gemini.env.example`). Same key naming idea as [awesome-o’s `.env` docs](https://github.com/zlisto/awesome-o.git).
-- **TTS (optional)**: `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` — omit to stop after `slide_description_narration.json`.
+- **`ffmpeg`** and **`ffprobe`** on `PATH` (final video step)
+- API keys in **`gemini.env`** at repo root (copy from `gemini.env.example`). Supports `GEMINI_API_KEY` or `GOOGLE_API_KEY`, or `OPENAI_API_KEY`; optional ElevenLabs for TTS.
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp gemini.env.example gemini.env
-# edit gemini.env and add your keys
+# edit gemini.env
 ```
 
 ## Run (from repo root)
+
+Use your lecture transcript (e.g. `Captions_English.txt` in this folder) and the PDF at the root:
 
 ```bash
 python run_lecture_pipeline.py \
@@ -78,10 +53,9 @@ python run_lecture_pipeline.py \
   --instructor-name "Dr. Smith"
 ```
 
-With ElevenLabs + ffmpeg configured, the final video is under the new project folder, basename matching the PDF (e.g. `Lecture_17_AI_screenplays.mp4`).
+If ElevenLabs is not configured, the run stops after narration JSON; see `AUDIO_VIDEO_SKIPPED.txt` in the new project folder.
 
 ## Notes
 
-- Narration is **sequential**; each slide uses **prior narrations** for continuity.
-- Slide **1** prompts a **title-slide intro** + short topic summary.
-- If ElevenLabs is missing, see `AUDIO_VIDEO_SKIPPED.txt` in the project folder.
+- Narration is sequential and uses prior slide narrations for continuity.
+- Slide 1 expects a title-style intro and short topic summary.

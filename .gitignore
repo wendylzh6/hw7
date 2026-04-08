@@ -1,23 +1,15 @@
 .env
 gemini.env
-style.json
+OpenAI_Key.env
 .DS_Store
 __pycache__/
 *.pyc
 .venv/
 
-# Large generated media (pipeline output)
+# Large / generated media from pipeline runs (under projects/…)
 *.mp4
-**/segments/**
-
-# Slide renders and TTS (keep directory via .gitkeep only)
-slide_images/*
-!slide_images/.gitkeep
-audio/*
-!audio/.gitkeep
-projects/**/slide_images/*
-!projects/**/slide_images/.gitkeep
-projects/**/audio/*
-!projects/**/audio/.gitkeep
+projects/**/slide_images/**
+projects/**/audio/**
+projects/**/segments/**
 
 projects/.gitkeep
